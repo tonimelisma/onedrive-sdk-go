@@ -8,10 +8,9 @@ import (
 )
 
 const rootUrl = "https://graph.microsoft.com/v1.0/"
-const resourceUrl = "me/"
 
 func GetMyDrives(client *http.Client) {
-	res, err := client.Get(rootUrl + resourceUrl + "drives")
+	res, err := client.Get(rootUrl + "me/drive/root/children")
 	if err != nil {
 		log.Fatalf("couldn't get HTTP: %v", err)
 	}
