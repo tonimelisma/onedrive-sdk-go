@@ -39,7 +39,7 @@ func apiCall(client *http.Client, url string) (*http.Response, error) {
 
 		var apiErr apiErrorResponse
 		if err := json.Unmarshal(resBody, &apiErr); err == nil {
-			if apiErr.Error == "invalid_grant" && apiErr.ErrorDescription == "AADSTS70000" {
+			if apiErr.Error == "invalid_grant" {
 				return nil, ErrGrantExpired
 			}
 		}
