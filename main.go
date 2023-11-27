@@ -2,7 +2,6 @@ package onedrive
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -16,39 +15,55 @@ const rootUrl = "https://graph.microsoft.com/v1.0/"
 
 // Sentinel errors
 var (
-	ErrAuthRequired  = errors.New("authentication required")
-	ErrInternalError = errors.New("internal server error")
-	ErrGrantExpired  = errors.New("grant expired, re-authentication required")
+	ErrReauthRequired = errors.New("re-authentication required")
+	ErrRetryLater     = errors.New("retry later")
 )
-
-type apiErrorResponse struct {
-	Error            string `json:"error"`
-	ErrorDescription string `json:"error_description"`
-}
 
 // apiCall handles the HTTP GET request and categorizes common errors.
 func apiCall(client *http.Client, url string) (*http.Response, error) {
 	res, err := client.Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("HTTP request failed: %v", err)
+		var oauth2RetrieveError *oauth2.RetrieveError
+		if errors.As(err, &oauth2RetrieveError) {
+			switch oauth2RetrieveError.ErrorCode {
+			case "invalid_request":
+				return nil, fmt.Errorf("unknown oauth2 error: %v", err)
+			case "invalid_client":
+				return nil, fmt.Errorf("%w: %v", ErrReauthRequired, err)
+			case "invalid_grant":
+				return nil, fmt.Errorf("%w: %v", ErrReauthRequired, err)
+			case "unauthorized_client":
+				return nil, fmt.Errorf("%w: %v", ErrReauthRequired, err)
+			case "unsupported_grant_type":
+				return nil, fmt.Errorf("unknown oauth2 error: %v", err)
+			case "invalid_scope":
+				return nil, fmt.Errorf("unknown oauth2 error: %v", err)
+			case "access_denied":
+				return nil, fmt.Errorf("%w: %v", ErrReauthRequired, err)
+			case "unsupported_response_type":
+				return nil, fmt.Errorf("unknown oauth2 error: %v", err)
+			case "server_error":
+				return nil, fmt.Errorf("%w: %v", ErrRetryLater, err)
+			case "temporarily_unavailable":
+				return nil, fmt.Errorf("%w: %v", ErrRetryLater, err)
+			default:
+				return nil, fmt.Errorf("unknown oauth2 error: %v", err)
+			}
+		} else {
+			// Likely a network error?
+			return nil, fmt.Errorf("%w: %v", ErrRetryLater, err)
+		}
 	}
 
 	if res.StatusCode >= 400 {
 		defer res.Body.Close()
 		resBody, _ := io.ReadAll(res.Body)
 
-		var apiErr apiErrorResponse
-		if err := json.Unmarshal(resBody, &apiErr); err == nil {
-			if apiErr.Error == "invalid_grant" {
-				return nil, ErrGrantExpired
-			}
-		}
-
 		switch res.StatusCode {
 		case http.StatusUnauthorized:
-			return nil, ErrAuthRequired
+			return nil, err
 		case http.StatusInternalServerError:
-			return nil, ErrInternalError
+			return nil, err
 		default:
 			return nil, fmt.Errorf("HTTP error: %s: %s", res.Status, string(resBody))
 		}
