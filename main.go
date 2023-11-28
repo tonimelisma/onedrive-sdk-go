@@ -75,16 +75,29 @@ func apiCall(client *http.Client, method, url string) (*http.Response, error) {
 
 		// Handling based on HTTP status codes
 		switch res.StatusCode {
-		case http.StatusBadRequest, http.StatusMethodNotAllowed,
-			http.StatusNotAcceptable:
-			return nil, fmt.Errorf("HTTP status %s - %s: %s", res.Status,
-				oneDriveError.Error.Code, oneDriveError.Error.Message)
+		case http.StatusBadRequest, http.StatusMethodNotAllowed, http.StatusNotAcceptable:
+			return nil, fmt.Errorf(
+				"HTTP status %s - %s: %s",
+				res.Status,
+				oneDriveError.Error.Code,
+				oneDriveError.Error.Message,
+			)
 		case http.StatusUnauthorized: // Unauthorized
-			return nil, fmt.Errorf("%w: HTTP status %s - %s: %s", ErrReauthRequired, res.Status, oneDriveError.Error.Code, oneDriveError.Error.Message)
+			return nil, fmt.Errorf(
+				"%w: HTTP status %s - %s: %s",
+				ErrReauthRequired, res.Status,
+				oneDriveError.Error.Code,
+				oneDriveError.Error.Message,
+			)
 		case http.StatusForbidden: // Forbidden
 			// Specific handling for Forbidden
 		case http.StatusNotFound, http.StatusGone: // Not Found
-			return nil, fmt.Errorf("HTTP status %s - %s: %s", res.Status, oneDriveError.Error.Code, oneDriveError.Error.Message)
+			return nil, fmt.Errorf(
+				"HTTP status %s - %s: %s",
+				res.Status,
+				oneDriveError.Error.Code,
+				oneDriveError.Error.Message,
+			)
 		case http.StatusConflict: // Conflict
 			// Specific handling for Conflict
 		case http.StatusLengthRequired: // Length Required
