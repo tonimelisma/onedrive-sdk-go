@@ -16,8 +16,13 @@ const rootUrl = "https://graph.microsoft.com/v1.0/"
 
 // Sentinel errors
 var (
-	ErrReauthRequired = errors.New("re-authentication required")
-	ErrRetryLater     = errors.New("retry later")
+	ErrReauthRequired   = errors.New("re-authentication required")
+	ErrAccessDenied     = errors.New("access denied")
+	ErrRetryLater       = errors.New("retry later")
+	ErrInvalidRequest   = errors.New("invalid request")
+	ErrResourceNotFound = errors.New("resource not found")
+	ErrConflict         = errors.New("conflict")
+	ErrQuotaExceeded    = errors.New("quota exceeded")
 )
 
 // apiCall handles the HTTP GET request and categorizes common errors.
@@ -32,32 +37,18 @@ func apiCall(client *http.Client, method, url string) (*http.Response, error) {
 		var oauth2RetrieveError *oauth2.RetrieveError
 		if errors.As(err, &oauth2RetrieveError) {
 			switch oauth2RetrieveError.ErrorCode {
-			case "invalid_request":
-				return nil, fmt.Errorf("unknown oauth2 error: %v", err)
-			case "invalid_client":
+			case "invalid_request", "invalid_client", "invalid_grant",
+				"unauthorized_client", "unsupported_grant_type",
+				"invalid_scope", "access_denied":
 				return nil, fmt.Errorf("%w: %v", ErrReauthRequired, err)
-			case "invalid_grant":
-				return nil, fmt.Errorf("%w: %v", ErrReauthRequired, err)
-			case "unauthorized_client":
-				return nil, fmt.Errorf("%w: %v", ErrReauthRequired, err)
-			case "unsupported_grant_type":
-				return nil, fmt.Errorf("unknown oauth2 error: %v", err)
-			case "invalid_scope":
-				return nil, fmt.Errorf("unknown oauth2 error: %v", err)
-			case "access_denied":
-				return nil, fmt.Errorf("%w: %v", ErrReauthRequired, err)
-			case "unsupported_response_type":
-				return nil, fmt.Errorf("unknown oauth2 error: %v", err)
-			case "server_error":
-				return nil, fmt.Errorf("%w: %v", ErrRetryLater, err)
-			case "temporarily_unavailable":
+			case "server_error", "temporarily_unavailable":
 				return nil, fmt.Errorf("%w: %v", ErrRetryLater, err)
 			default:
-				return nil, fmt.Errorf("unknown oauth2 error: %v", err)
+				return nil, fmt.Errorf("other oauth2 error: %v", err)
 			}
 		} else {
 			// Likely a network error?
-			return nil, fmt.Errorf("%w: %v", ErrRetryLater, err)
+			return nil, fmt.Errorf("unsupported oauth2 error: %v", err)
 		}
 	}
 
@@ -71,92 +62,58 @@ func apiCall(client *http.Client, method, url string) (*http.Response, error) {
 				Message string `json:"message"`
 			} `json:"error"`
 		}
-		json.Unmarshal(resBody, &oneDriveError)
 
-		// Handling based on HTTP status codes
-		switch res.StatusCode {
-		case http.StatusBadRequest, http.StatusMethodNotAllowed, http.StatusNotAcceptable:
-			return nil, fmt.Errorf(
-				"HTTP status %s - %s: %s",
-				res.Status,
-				oneDriveError.Error.Code,
-				oneDriveError.Error.Message,
-			)
-		case http.StatusUnauthorized: // Unauthorized
-			return nil, fmt.Errorf(
-				"%w: HTTP status %s - %s: %s",
-				ErrReauthRequired, res.Status,
-				oneDriveError.Error.Code,
-				oneDriveError.Error.Message,
-			)
-		case http.StatusForbidden: // Forbidden
-			// Specific handling for Forbidden
-		case http.StatusNotFound, http.StatusGone: // Not Found
-			return nil, fmt.Errorf(
-				"HTTP status %s - %s: %s",
-				res.Status,
-				oneDriveError.Error.Code,
-				oneDriveError.Error.Message,
-			)
-		case http.StatusConflict: // Conflict
-			// Specific handling for Conflict
-		case http.StatusLengthRequired: // Length Required
-			// Specific handling for Length Required
-		case http.StatusPreconditionFailed: // Precondition Failed
-			// Specific handling for Precondition Failed
-		case http.StatusRequestEntityTooLarge: // Request Entity Too Large
-			// Specific handling for Request Entity Too Large
-		case http.StatusUnsupportedMediaType: // Unsupported Media Type
-			// Specific handling for Unsupported Media Type
-		case http.StatusRequestedRangeNotSatisfiable: // Requested Range Not Satisfiable
-			// Specific handling for Requested Range Not Satisfiable
-		case http.StatusUnprocessableEntity: // Unprocessable Entity
-			// Specific handling for Unprocessable Entity
-		case http.StatusTooManyRequests, http.StatusInternalServerError,
-			http.StatusServiceUnavailable, 509: // Too Many Requests
-			return nil, fmt.Errorf("%w: %v", ErrRetryLater, err)
-		case http.StatusNotImplemented: // Not Implemented
-			// Specific handling for Not Implemented
-		case http.StatusInsufficientStorage: // Insufficient Storage
-			// Specific handling for Insufficient Storage
-		default:
-			return nil, fmt.Errorf("HTTP error: %s - %s", res.Status, oneDriveError.Error.Code)
-		}
+		jsonErr := json.Unmarshal(resBody, &oneDriveError)
 
-		// Handling based on OneDrive-specific error codes
-		switch oneDriveError.Error.Code {
-		case "accessDenied":
-			// Handle access denied
-		case "activityLimitReached":
-			// Handle activity limit reached
-		case "generalException":
-			// Handle general exception
-		case "invalidRange":
-			// Handle invalid range
-		case "invalidRequest":
-			// Handle invalid request
-		case "itemNotFound":
-			// Handle item not found
-		case "malwareDetected":
-			// Handle malware detected
-		case "nameAlreadyExists":
-			// Handle name already exists
-		case "notAllowed":
-			// Handle not allowed
-		case "notSupported":
-			// Handle not supported
-		case "resourceModified":
-			// Handle resource modified
-		case "resyncRequired":
-			// Handle resync required
-		case "serviceNotAvailable":
-			// Handle service not available
-		case "quotaLimitReached":
-			// Handle quota limit reached
-		case "unauthenticated":
-			// Handle unauthenticated
-		default:
-			return nil, fmt.Errorf("OneDrive error: %s - %s", res.Status, oneDriveError.Error.Code)
+		if jsonErr == nil && oneDriveError.Error.Code != "" {
+			switch oneDriveError.Error.Code {
+			case "accessDenied":
+				return nil, fmt.Errorf("%w: %s", ErrAccessDenied, oneDriveError.Error.Message)
+			case "activityLimitReached":
+				return nil, fmt.Errorf("%w: %s", ErrRetryLater, oneDriveError.Error.Message)
+			case "itemNotFound":
+				return nil, fmt.Errorf("%w: %s", ErrResourceNotFound, oneDriveError.Error.Message)
+			case "nameAlreadyExists":
+				return nil, fmt.Errorf("%w: %s", ErrConflict, oneDriveError.Error.Message)
+			case "invalidRange", "invalidRequest", "malwareDetected",
+				"notAllowed", "notSupported", "resourceModified",
+				"resyncRequired", "generalException":
+				return nil, fmt.Errorf("%w: %s", ErrInvalidRequest, oneDriveError.Error.Message)
+			case "quotaLimitReached":
+				return nil, fmt.Errorf("%w: %s", ErrQuotaExceeded, oneDriveError.Error.Message)
+			case "unauthenticated":
+				return nil, fmt.Errorf("%w: %s", ErrReauthRequired, oneDriveError.Error.Message)
+			case "serviceNotAvailable":
+				return nil, fmt.Errorf("%w: %s", ErrRetryLater, oneDriveError.Error.Message)
+			default:
+				return nil, fmt.Errorf(
+					"OneDrive error: %s - %s",
+					res.Status,
+					oneDriveError.Error.Message,
+				)
+			}
+		} else {
+			switch res.StatusCode {
+			case http.StatusBadRequest, http.StatusMethodNotAllowed, http.StatusNotAcceptable,
+				http.StatusLengthRequired, http.StatusPreconditionFailed,
+				http.StatusRequestEntityTooLarge, http.StatusUnsupportedMediaType,
+				http.StatusRequestedRangeNotSatisfiable, http.StatusUnprocessableEntity:
+				return nil, fmt.Errorf("%w: %s", ErrInvalidRequest, oneDriveError.Error.Message)
+			case http.StatusUnauthorized, http.StatusForbidden:
+				return nil, fmt.Errorf("%w: %s", ErrReauthRequired, oneDriveError.Error.Message)
+			case http.StatusNotFound:
+				return nil, fmt.Errorf("%w: %s", ErrResourceNotFound, oneDriveError.Error.Message)
+			case http.StatusConflict:
+				return nil, fmt.Errorf("%w: %s", ErrConflict, oneDriveError.Error.Message)
+			case http.StatusInsufficientStorage:
+				return nil, fmt.Errorf("%w: %s", ErrQuotaExceeded, oneDriveError.Error.Message)
+			case http.StatusGone, http.StatusNotImplemented,
+				http.StatusTooManyRequests,
+				http.StatusInternalServerError, http.StatusServiceUnavailable, 509:
+				return nil, fmt.Errorf("%w: %s", ErrRetryLater, oneDriveError.Error.Message)
+			default:
+				return nil, fmt.Errorf("HTTP error: %s - %s", res.Status, oneDriveError.Error.Message)
+			}
 		}
 	}
 
