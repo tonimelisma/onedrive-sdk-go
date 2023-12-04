@@ -187,18 +187,22 @@ type OAuthToken oauth2.Token
 
 // StartAuthentication initiates the OAuth authentication process.
 func StartAuthentication(
-	clientID string,
-) (ctx context.Context, oauthConfig *oauth2.Config, authURL string, codeVerifier string, err error) {
-	logger.Debug("StartAuthentication called with clientID: ", clientID)
-	ctx, oauthConfig = getOauth2Config(clientID)
+	ctx context.Context,
+	oauthConfig *oauth2.Config,
+) (authURL string, codeVerifier string, err error) {
+	logger.Debug("StartAuthentication called")
+	if ctx == nil {
+		logger.Error("OAuth configuration is nil")
+		return "", "", errors.New("oauth configuration is nil")
+	}
 	if oauthConfig == nil {
 		logger.Error("OAuth configuration is nil")
-		return nil, nil, "", "", errors.New("oauth configuration is nil")
+		return "", "", errors.New("oauth configuration is nil")
 	}
 
 	verifier, err := cv.CreateCodeVerifier()
 	if err != nil {
-		return nil, nil, "", "", fmt.Errorf("creating code verifier: %v", err)
+		return "", "", fmt.Errorf("creating code verifier: %v", err)
 	}
 
 	authURL = oauthConfig.AuthCodeURL(
@@ -206,7 +210,7 @@ func StartAuthentication(
 		oauth2.SetAuthURLParam("code_challenge", verifier.CodeChallengeS256()),
 		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
 	)
-	return ctx, oauthConfig, authURL, verifier.String(), nil
+	return authURL, verifier.String(), nil
 }
 
 // CompleteAuthentication completes the OAuth authentication process.
@@ -246,8 +250,8 @@ func NewClient(ctx context.Context, oauthConfig *oauth2.Config, token OAuthToken
 	return oauthConfig.Client(ctx, (*oauth2.Token)(&token))
 }
 
-// getOauth2Config returns the OAuth2 configuration.
-func getOauth2Config(clientID string) (context.Context, *oauth2.Config) {
+// GetOauth2Config returns the OAuth2 configuration.
+func GetOauth2Config(clientID string) (context.Context, *oauth2.Config) {
 	logger.Debug("Creating OAuth2 configuration in getOauth2Config")
 	if clientID == "" {
 		logger.Error("ClientID is empty in getOauth2Config")
