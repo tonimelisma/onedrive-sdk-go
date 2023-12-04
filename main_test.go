@@ -1,11 +1,14 @@
 package onedrive
 
 import (
+	"context"
 	"errors"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"testing"
+
+	"golang.org/x/oauth2"
 )
 
 // Mocking the HTTP client and RoundTripper
@@ -454,5 +457,74 @@ func TestApiCall_StatusBandwidthLimitExceeded(t *testing.T) {
 	_, err := apiCall(client, "GET", "https://example.com")
 	if !errors.Is(err, ErrRetryLater) {
 		t.Errorf("Expected ErrRetryLater for 509 Bandwidth Limit Exceeded, got %v", err)
+	}
+}
+
+func TestSetLogger(t *testing.T) {
+	var customLogger Logger = DefaultLogger{}
+	SetLogger(customLogger)
+
+	if logger != customLogger {
+		t.Errorf("Expected logger to be set to custom logger, but it was not")
+	}
+}
+
+func TestGetOauth2Config(t *testing.T) {
+	clientID := "test-client-id"
+	ctx, config := GetOauth2Config(clientID)
+
+	if ctx == nil {
+		t.Errorf("Expected non-nil context")
+	}
+	if config == nil {
+		t.Fatalf("Expected non-nil config")
+	}
+	if config.ClientID != clientID {
+		t.Errorf("Expected ClientID to be '%s', got '%s'", clientID, config.ClientID)
+	}
+	// Further assertions can be added for Scopes, Endpoint.AuthURL, and Endpoint.TokenURL
+}
+
+func TestStartAuthentication(t *testing.T) {
+	ctx := context.Background()
+	oauthConfig := &oauth2.Config{
+		ClientID: "test-client-id",
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  OAuthAuthURL,
+			TokenURL: OAuthTokenURL,
+		},
+	}
+
+	authURL, codeVerifier, err := StartAuthentication(ctx, oauthConfig)
+	if err != nil {
+		t.Errorf("StartAuthentication returned an error: %v", err)
+	}
+	if authURL == "" || codeVerifier == "" {
+		t.Errorf("StartAuthentication returned empty authURL or codeVerifier")
+	}
+	// Additional checks can be added to verify the format of the authURL and the codeVerifier
+}
+
+func TestCompleteAuthentication(t *testing.T) {
+	ctx := context.Background()
+	oauthConfig := &oauth2.Config{} // Simplified for example
+	code := "test-code"
+	verifier := "test-verifier"
+
+	_, err := CompleteAuthentication(ctx, oauthConfig, code, verifier)
+	if err == nil {
+		t.Errorf("Expected error due to invalid oauthConfig, code, or verifier, but got none")
+	}
+	// Further testing would require mocking the oauthConfig.Exchange call
+}
+
+func TestNewClient(t *testing.T) {
+	ctx := context.Background()
+	oauthConfig := &oauth2.Config{} // Simplified for example
+	token := OAuthToken{}
+
+	client := NewClient(ctx, oauthConfig, token)
+	if client == nil {
+		t.Errorf("Expected non-nil *http.Client, got nil")
 	}
 }
