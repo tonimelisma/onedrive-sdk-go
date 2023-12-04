@@ -34,16 +34,12 @@ var (
 
 type Logger interface {
 	Debug(v ...interface{})
-	Info(v ...interface{})
-	Error(v ...interface{})
 	// Add more methods if needed
 }
 
 type DefaultLogger struct{}
 
 func (l DefaultLogger) Debug(v ...interface{}) {}
-func (l DefaultLogger) Info(v ...interface{})  {}
-func (l DefaultLogger) Error(v ...interface{}) {}
 
 var logger Logger = DefaultLogger{}
 
@@ -57,7 +53,6 @@ func apiCall(client *http.Client, method, url string) (*http.Response, error) {
 	logger.Debug("apiCall invoked with method: ", method, ", URL: ", url)
 
 	if client == nil {
-		logger.Error("HTTP client is nil in apiCall")
 		return nil, errors.New("http client is nil")
 	}
 
@@ -192,11 +187,9 @@ func StartAuthentication(
 ) (authURL string, codeVerifier string, err error) {
 	logger.Debug("StartAuthentication called")
 	if ctx == nil {
-		logger.Error("OAuth configuration is nil")
 		return "", "", errors.New("oauth configuration is nil")
 	}
 	if oauthConfig == nil {
-		logger.Error("OAuth configuration is nil")
 		return "", "", errors.New("oauth configuration is nil")
 	}
 
@@ -221,7 +214,6 @@ func CompleteAuthentication(
 	verifier string,
 ) (*OAuthToken, error) {
 	if oauthConfig == nil {
-		logger.Error("OAuth configuration is nil in CompleteAuthentication")
 		return nil, errors.New("oauth configuration is nil")
 	}
 
@@ -238,12 +230,10 @@ func CompleteAuthentication(
 // NewClient creates a new HTTP client with the given OAuth token.
 func NewClient(ctx context.Context, oauthConfig *oauth2.Config, token OAuthToken) *http.Client {
 	if ctx == nil {
-		logger.Error("Context is nil in NewClient")
 		return nil
 	}
 
 	if oauthConfig == nil {
-		logger.Error("OAuth configuration is nil in NewClient")
 		return nil
 	}
 
@@ -254,7 +244,6 @@ func NewClient(ctx context.Context, oauthConfig *oauth2.Config, token OAuthToken
 func GetOauth2Config(clientID string) (context.Context, *oauth2.Config) {
 	logger.Debug("Creating OAuth2 configuration in getOauth2Config")
 	if clientID == "" {
-		logger.Error("ClientID is empty in getOauth2Config")
 		return nil, nil
 	}
 
