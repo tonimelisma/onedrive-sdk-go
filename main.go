@@ -32,6 +32,35 @@ var (
 	ErrQuotaExceeded    = errors.New("quota exceeded")
 )
 
+// Custom token source to allow for caching refreshed tokens
+// (golang oauth2 library issue #84, not fixed for 6 years and counting)
+
+type customTokenSource struct {
+	base           oauth2.TokenSource
+	cachedToken    *oauth2.Token
+	onTokenRefresh func(*oauth2.Token)
+}
+
+func (cts *customTokenSource) Token() (*oauth2.Token, error) {
+	token, err := cts.base.Token()
+	if err != nil {
+		return nil, err
+	}
+
+	// Compare the new token with the cached token
+	if cts.cachedToken == nil || token.AccessToken != cts.cachedToken.AccessToken {
+		// Tokens are different, indicating a refresh
+		if cts.onTokenRefresh != nil {
+			cts.onTokenRefresh(token)
+		}
+		cts.cachedToken = token // Update the cached token
+	}
+
+	return token, nil
+}
+
+// Logger is the interface that the SDK uses for logging.
+
 type Logger interface {
 	Debug(v ...interface{})
 	// Add more methods if needed
@@ -228,16 +257,21 @@ func CompleteAuthentication(
 }
 
 // NewClient creates a new HTTP client with the given OAuth token.
-func NewClient(ctx context.Context, oauthConfig *oauth2.Config, token OAuthToken) *http.Client {
-	if ctx == nil {
+func NewClient(ctx context.Context, oauthConfig *oauth2.Config, token OAuthToken, tokenRefreshCallback func(*oauth2.Token)) *http.Client {
+	if ctx == nil || oauthConfig == nil {
 		return nil
 	}
 
-	if oauthConfig == nil {
-		return nil
+	// TODO Ensure the token is valid or initialized before using it
+
+	originalTokenSource := oauthConfig.TokenSource(ctx, (*oauth2.Token)(&token))
+	customTokenSource := &customTokenSource{
+		base:           originalTokenSource,
+		onTokenRefresh: tokenRefreshCallback,
+		cachedToken:    (*oauth2.Token)(&token),
 	}
 
-	return oauthConfig.Client(ctx, (*oauth2.Token)(&token))
+	return oauth2.NewClient(ctx, customTokenSource)
 }
 
 // GetOauth2Config returns the OAuth2 configuration.

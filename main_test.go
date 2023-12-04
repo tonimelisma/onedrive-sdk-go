@@ -523,7 +523,7 @@ func TestNewClient(t *testing.T) {
 	oauthConfig := &oauth2.Config{} // Simplified for example
 	token := OAuthToken{}
 
-	client := NewClient(ctx, oauthConfig, token)
+	client := NewClient(ctx, oauthConfig, token, nil)
 	if client == nil {
 		t.Errorf("Expected non-nil *http.Client, got nil")
 	}
