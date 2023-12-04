@@ -12,7 +12,14 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const rootUrl = "https://graph.microsoft.com/v1.0/"
+// OAuth2 scopes and endpoints
+var OAuthScopes = []string{"offline_access", "files.readwrite.all"}
+
+const (
+	OAuthAuthURL  = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
+	OAuthTokenURL = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+	rootUrl       = "https://graph.microsoft.com/v1.0/"
+)
 
 // Sentinel errors
 var (
@@ -25,13 +32,41 @@ var (
 	ErrQuotaExceeded    = errors.New("quota exceeded")
 )
 
+type Logger interface {
+	Debug(v ...interface{})
+	Info(v ...interface{})
+	Error(v ...interface{})
+	// Add more methods if needed
+}
+
+type DefaultLogger struct{}
+
+func (l DefaultLogger) Debug(v ...interface{}) {}
+func (l DefaultLogger) Info(v ...interface{})  {}
+func (l DefaultLogger) Error(v ...interface{}) {}
+
+var logger Logger = DefaultLogger{}
+
+// SetLogger allows users of the SDK to set their own logger
+func SetLogger(l Logger) {
+	logger = l
+}
+
 // apiCall handles the HTTP GET request and categorizes common errors.
 func apiCall(client *http.Client, method, url string) (*http.Response, error) {
+	logger.Debug("apiCall invoked with method: ", method, ", URL: ", url)
+
+	if client == nil {
+		logger.Error("HTTP client is nil in apiCall")
+		return nil, errors.New("http client is nil")
+	}
+
 	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request failed: %v", err)
 	}
 
+	logger.Debug("Request created, sending request...")
 	res, err := client.Do(req)
 	if err != nil {
 		var oauth2RetrieveError *oauth2.RetrieveError
@@ -122,6 +157,8 @@ func apiCall(client *http.Client, method, url string) (*http.Response, error) {
 
 // GetMyDrives retrieves the drives information.
 func GetMyDrives(client *http.Client) error {
+	logger.Debug("GetMyDrives called")
+
 	res, err := apiCall(client, "GET", rootUrl+"me/drive/root/children")
 	if err != nil {
 		return err
@@ -133,9 +170,14 @@ func GetMyDrives(client *http.Client) error {
 		return fmt.Errorf("couldn't parse body: %v", err)
 	}
 
-	fmt.Println("Header:\n", res.Header)
-	fmt.Println("Status:\n", res.Status)
-	fmt.Println("Body:\n", string(resBody))
+	logger.Debug(
+		"Response in GetMyDrives - Header: ",
+		res.Header,
+		", Status: ",
+		res.Status,
+		", Body: ",
+		string(resBody),
+	)
 
 	return nil
 }
@@ -144,11 +186,19 @@ func GetMyDrives(client *http.Client) error {
 type OAuthToken oauth2.Token
 
 // StartAuthentication initiates the OAuth authentication process.
-func StartAuthentication() (authURL string, codeVerifier string, err error) {
-	_, oauthConfig := getOauth2Config()
+func StartAuthentication(
+	clientID string,
+) (ctx context.Context, oauthConfig *oauth2.Config, authURL string, codeVerifier string, err error) {
+	logger.Debug("StartAuthentication called with clientID: ", clientID)
+	ctx, oauthConfig = getOauth2Config(clientID)
+	if oauthConfig == nil {
+		logger.Error("OAuth configuration is nil")
+		return nil, nil, "", "", errors.New("oauth configuration is nil")
+	}
+
 	verifier, err := cv.CreateCodeVerifier()
 	if err != nil {
-		return "", "", fmt.Errorf("creating code verifier: %v", err)
+		return nil, nil, "", "", fmt.Errorf("creating code verifier: %v", err)
 	}
 
 	authURL = oauthConfig.AuthCodeURL(
@@ -156,13 +206,22 @@ func StartAuthentication() (authURL string, codeVerifier string, err error) {
 		oauth2.SetAuthURLParam("code_challenge", verifier.CodeChallengeS256()),
 		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
 	)
-	return authURL, verifier.String(), nil
+	return ctx, oauthConfig, authURL, verifier.String(), nil
 }
 
 // CompleteAuthentication completes the OAuth authentication process.
-func CompleteAuthentication(code string, verifier string) (*OAuthToken, error) {
-	ctx, oauthConfig := getOauth2Config()
+func CompleteAuthentication(
+	ctx context.Context,
+	oauthConfig *oauth2.Config,
+	code string,
+	verifier string,
+) (*OAuthToken, error) {
+	if oauthConfig == nil {
+		logger.Error("OAuth configuration is nil in CompleteAuthentication")
+		return nil, errors.New("oauth configuration is nil")
+	}
 
+	logger.Debug("Exchanging code for token in CompleteAuthentication")
 	token, err := oauthConfig.Exchange(ctx, code, oauth2.SetAuthURLParam("code_verifier", verifier))
 	if err != nil {
 		return nil, fmt.Errorf("exchanging code for token: %v", err)
@@ -173,19 +232,34 @@ func CompleteAuthentication(code string, verifier string) (*OAuthToken, error) {
 }
 
 // NewClient creates a new HTTP client with the given OAuth token.
-func NewClient(token OAuthToken) *http.Client {
-	ctx, oauthConfig := getOauth2Config()
+func NewClient(ctx context.Context, oauthConfig *oauth2.Config, token OAuthToken) *http.Client {
+	if ctx == nil {
+		logger.Error("Context is nil in NewClient")
+		return nil
+	}
+
+	if oauthConfig == nil {
+		logger.Error("OAuth configuration is nil in NewClient")
+		return nil
+	}
+
 	return oauthConfig.Client(ctx, (*oauth2.Token)(&token))
 }
 
 // getOauth2Config returns the OAuth2 configuration.
-func getOauth2Config() (context.Context, *oauth2.Config) {
+func getOauth2Config(clientID string) (context.Context, *oauth2.Config) {
+	logger.Debug("Creating OAuth2 configuration in getOauth2Config")
+	if clientID == "" {
+		logger.Error("ClientID is empty in getOauth2Config")
+		return nil, nil
+	}
+
 	return context.Background(), &oauth2.Config{
-		ClientID: "71ae7ad2-0207-4618-90d3-d21db38f9f7a",
-		Scopes:   []string{"offline_access", "files.readwrite.all"},
+		ClientID: clientID,
+		Scopes:   OAuthScopes,
 		Endpoint: oauth2.Endpoint{
-			AuthURL:  "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-			TokenURL: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+			AuthURL:  OAuthAuthURL,
+			TokenURL: OAuthTokenURL,
 		},
 	}
 }
