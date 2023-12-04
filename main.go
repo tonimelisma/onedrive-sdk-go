@@ -101,13 +101,13 @@ func apiCall(client *http.Client, method, url string) (*http.Response, error) {
 				return nil, fmt.Errorf("%w: %s", ErrInvalidRequest, oneDriveError.Error.Message)
 			case http.StatusUnauthorized, http.StatusForbidden:
 				return nil, fmt.Errorf("%w: %s", ErrReauthRequired, oneDriveError.Error.Message)
-			case http.StatusNotFound:
+			case http.StatusGone, http.StatusNotFound:
 				return nil, fmt.Errorf("%w: %s", ErrResourceNotFound, oneDriveError.Error.Message)
 			case http.StatusConflict:
 				return nil, fmt.Errorf("%w: %s", ErrConflict, oneDriveError.Error.Message)
 			case http.StatusInsufficientStorage:
 				return nil, fmt.Errorf("%w: %s", ErrQuotaExceeded, oneDriveError.Error.Message)
-			case http.StatusGone, http.StatusNotImplemented,
+			case http.StatusNotImplemented,
 				http.StatusTooManyRequests,
 				http.StatusInternalServerError, http.StatusServiceUnavailable, 509:
 				return nil, fmt.Errorf("%w: %s", ErrRetryLater, oneDriveError.Error.Message)

@@ -286,4 +286,173 @@ func TestApiCall_BadRequest(t *testing.T) {
 	}
 }
 
-// Repeat this pattern for each significant HTTP status code...
+// Test for HTTP Status Code: Method Not Allowed
+func TestApiCall_MethodNotAllowed(t *testing.T) {
+	client := mockHttpClient(http.StatusMethodNotAllowed, "")
+	_, err := apiCall(client, "GET", "https://example.com")
+	if !errors.Is(err, ErrInvalidRequest) {
+		t.Errorf("Expected ErrInvalidRequest for MethodNotAllowed, got %v", err)
+	}
+}
+
+// Test for HTTP Status Code: Not Acceptable
+func TestApiCall_NotAcceptable(t *testing.T) {
+	client := mockHttpClient(http.StatusNotAcceptable, "")
+	_, err := apiCall(client, "GET", "https://example.com")
+	if !errors.Is(err, ErrInvalidRequest) {
+		t.Errorf("Expected ErrInvalidRequest for NotAcceptable, got %v", err)
+	}
+}
+
+// Test for HTTP Status Code: Length Required
+func TestApiCall_LengthRequired(t *testing.T) {
+	client := mockHttpClient(http.StatusLengthRequired, "")
+	_, err := apiCall(client, "GET", "https://example.com")
+	if !errors.Is(err, ErrInvalidRequest) {
+		t.Errorf("Expected ErrInvalidRequest for LengthRequired, got %v", err)
+	}
+}
+
+// Test for HTTP Status Code: Precondition Failed
+func TestApiCall_PreconditionFailed(t *testing.T) {
+	client := mockHttpClient(http.StatusPreconditionFailed, "")
+	_, err := apiCall(client, "GET", "https://example.com")
+	if !errors.Is(err, ErrInvalidRequest) {
+		t.Errorf("Expected ErrInvalidRequest for PreconditionFailed, got %v", err)
+	}
+}
+
+// Test for HTTP Status Code: Request Entity Too Large
+func TestApiCall_RequestEntityTooLarge(t *testing.T) {
+	client := mockHttpClient(http.StatusRequestEntityTooLarge, "")
+	_, err := apiCall(client, "GET", "https://example.com")
+	if !errors.Is(err, ErrInvalidRequest) {
+		t.Errorf("Expected ErrInvalidRequest for RequestEntityTooLarge, got %v", err)
+	}
+}
+
+// Test for HTTP Status Code: Unsupported Media Type
+func TestApiCall_UnsupportedMediaType(t *testing.T) {
+	client := mockHttpClient(http.StatusUnsupportedMediaType, "")
+	_, err := apiCall(client, "GET", "https://example.com")
+	if !errors.Is(err, ErrInvalidRequest) {
+		t.Errorf("Expected ErrInvalidRequest for UnsupportedMediaType, got %v", err)
+	}
+}
+
+// Test for HTTP Status Code: Requested Range Not Satisfiable
+func TestApiCall_RequestedRangeNotSatisfiable(t *testing.T) {
+	client := mockHttpClient(http.StatusRequestedRangeNotSatisfiable, "")
+	_, err := apiCall(client, "GET", "https://example.com")
+	if !errors.Is(err, ErrInvalidRequest) {
+		t.Errorf("Expected ErrInvalidRequest for RequestedRangeNotSatisfiable, got %v", err)
+	}
+}
+
+// Test for HTTP Status Code: Unprocessable Entity
+func TestApiCall_UnprocessableEntity(t *testing.T) {
+	client := mockHttpClient(http.StatusUnprocessableEntity, "")
+	_, err := apiCall(client, "GET", "https://example.com")
+	if !errors.Is(err, ErrInvalidRequest) {
+		t.Errorf("Expected ErrInvalidRequest for UnprocessableEntity, got %v", err)
+	}
+}
+
+// Test for HTTP Status Code: Unauthorized
+func TestApiCall_Unauthorized(t *testing.T) {
+	client := mockHttpClient(http.StatusUnauthorized, "")
+	_, err := apiCall(client, "GET", "https://example.com")
+	if !errors.Is(err, ErrReauthRequired) {
+		t.Errorf("Expected ErrReauthRequired for Unauthorized, got %v", err)
+	}
+}
+
+// Test for HTTP Status Code: Forbidden
+func TestApiCall_Forbidden(t *testing.T) {
+	client := mockHttpClient(http.StatusForbidden, "")
+	_, err := apiCall(client, "GET", "https://example.com")
+	if !errors.Is(err, ErrReauthRequired) {
+		t.Errorf("Expected ErrReauthRequired for Forbidden, got %v", err)
+	}
+}
+
+// Test for HTTP Status Code: Not Found
+func TestApiCall_NotFound(t *testing.T) {
+	client := mockHttpClient(http.StatusNotFound, "")
+	_, err := apiCall(client, "GET", "https://example.com")
+	if !errors.Is(err, ErrResourceNotFound) {
+		t.Errorf("Expected ErrResourceNotFound for NotFound, got %v", err)
+	}
+}
+
+// Test for HTTP Status Code: Conflict
+func TestApiCall_Conflict(t *testing.T) {
+	client := mockHttpClient(http.StatusConflict, "")
+	_, err := apiCall(client, "GET", "https://example.com")
+	if !errors.Is(err, ErrConflict) {
+		t.Errorf("Expected ErrConflict for Conflict, got %v", err)
+	}
+}
+
+// Test for HTTP Status Code: Insufficient Storage
+func TestApiCall_InsufficientStorage(t *testing.T) {
+	client := mockHttpClient(http.StatusInsufficientStorage, "")
+	_, err := apiCall(client, "GET", "https://example.com")
+	if !errors.Is(err, ErrQuotaExceeded) {
+		t.Errorf("Expected ErrQuotaExceeded for InsufficientStorage, got %v", err)
+	}
+}
+
+// Test for HTTP Status Code: Gone
+func TestApiCall_Gone(t *testing.T) {
+	client := mockHttpClient(http.StatusGone, "")
+	_, err := apiCall(client, "GET", "https://example.com")
+	if !errors.Is(err, ErrResourceNotFound) {
+		t.Errorf("Expected ErrResourceNotFound for Gone, got %v", err)
+	}
+}
+
+// Test for HTTP Status Code: Not Implemented
+func TestApiCall_NotImplemented(t *testing.T) {
+	client := mockHttpClient(http.StatusNotImplemented, "")
+	_, err := apiCall(client, "GET", "https://example.com")
+	if !errors.Is(err, ErrRetryLater) {
+		t.Errorf("Expected ErrRetryLater for NotImplemented, got %v", err)
+	}
+}
+
+// Test for HTTP Status Code: Too Many Requests
+func TestApiCall_TooManyRequests(t *testing.T) {
+	client := mockHttpClient(http.StatusTooManyRequests, "")
+	_, err := apiCall(client, "GET", "https://example.com")
+	if !errors.Is(err, ErrRetryLater) {
+		t.Errorf("Expected ErrRetryLater for TooManyRequests, got %v", err)
+	}
+}
+
+// Test for HTTP Status Code: Internal Server Error
+func TestApiCall_InternalServerError(t *testing.T) {
+	client := mockHttpClient(http.StatusInternalServerError, "")
+	_, err := apiCall(client, "GET", "https://example.com")
+	if !errors.Is(err, ErrRetryLater) {
+		t.Errorf("Expected ErrRetryLater for InternalServerError, got %v", err)
+	}
+}
+
+// Test for HTTP Status Code: Service Unavailable
+func TestApiCall_ServiceUnavailable(t *testing.T) {
+	client := mockHttpClient(http.StatusServiceUnavailable, "")
+	_, err := apiCall(client, "GET", "https://example.com")
+	if !errors.Is(err, ErrRetryLater) {
+		t.Errorf("Expected ErrRetryLater for ServiceUnavailable, got %v", err)
+	}
+}
+
+// Test for Custom HTTP Status Code: 509
+func TestApiCall_StatusBandwidthLimitExceeded(t *testing.T) {
+	client := mockHttpClient(509, "")
+	_, err := apiCall(client, "GET", "https://example.com")
+	if !errors.Is(err, ErrRetryLater) {
+		t.Errorf("Expected ErrRetryLater for 509 Bandwidth Limit Exceeded, got %v", err)
+	}
+}
