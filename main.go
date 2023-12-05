@@ -42,6 +42,7 @@ type customTokenSource struct {
 }
 
 func (cts *customTokenSource) Token() (*oauth2.Token, error) {
+	logger.Debug("Token called in customTokenSource")
 	token, err := cts.base.Token()
 	if err != nil {
 		return nil, err
@@ -68,8 +69,10 @@ type Logger interface {
 
 type DefaultLogger struct{}
 
+// The Debug method by default is empty
 func (l DefaultLogger) Debug(v ...interface{}) {}
 
+// Instantiate the default logger
 var logger Logger = DefaultLogger{}
 
 // SetLogger allows users of the SDK to set their own logger
