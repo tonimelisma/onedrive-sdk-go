@@ -266,18 +266,22 @@ func CompleteAuthentication(
 }
 
 // NewClient creates a new HTTP client with the given OAuth token.
-func NewClient(ctx context.Context, oauthConfig *OAuthConfig, token OAuthToken, tokenRefreshCallback func(*oauth2.Token)) *http.Client {
+func NewClient(ctx context.Context, oauthConfig *OAuthConfig, token OAuthToken, tokenRefreshCallback func(*OAuthToken)) *http.Client {
 	if ctx == nil || oauthConfig == nil {
 		return nil
 	}
 
 	// TODO Ensure the token is valid or initialized before using it
 
+	tokenRefreshCallbackWrapper := func(token *oauth2.Token) {
+		tokenRefreshCallback((*OAuthToken)(token))
+	}
+
 	oauthConfig2 := oauth2.Config(*oauthConfig)
 	originalTokenSource := oauthConfig2.TokenSource(ctx, (*oauth2.Token)(&token))
 	customTokenSource := &customTokenSource{
 		base:           originalTokenSource,
-		onTokenRefresh: tokenRefreshCallback,
+		onTokenRefresh: tokenRefreshCallbackWrapper,
 		cachedToken:    (*oauth2.Token)(&token),
 	}
 
