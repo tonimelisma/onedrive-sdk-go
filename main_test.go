@@ -495,7 +495,7 @@ func TestStartAuthentication(t *testing.T) {
 		},
 	}
 
-	authURL, codeVerifier, err := StartAuthentication(ctx, oauthConfig)
+	authURL, codeVerifier, err := StartAuthentication(ctx, (*OAuthConfig)(oauthConfig))
 	if err != nil {
 		t.Errorf("StartAuthentication returned an error: %v", err)
 	}
@@ -511,7 +511,7 @@ func TestCompleteAuthentication(t *testing.T) {
 	code := "test-code"
 	verifier := "test-verifier"
 
-	_, err := CompleteAuthentication(ctx, oauthConfig, code, verifier)
+	_, err := CompleteAuthentication(ctx, (*OAuthConfig)(oauthConfig), code, verifier)
 	if err == nil {
 		t.Errorf("Expected error due to invalid oauthConfig, code, or verifier, but got none")
 	}
@@ -523,7 +523,7 @@ func TestNewClient(t *testing.T) {
 	oauthConfig := &oauth2.Config{} // Simplified for example
 	token := OAuthToken{}
 
-	client := NewClient(ctx, oauthConfig, token, nil)
+	client := NewClient(ctx, (*OAuthConfig)(oauthConfig), token, nil)
 	if client == nil {
 		t.Errorf("Expected non-nil *http.Client, got nil")
 	}

@@ -21,6 +21,12 @@ const (
 	rootUrl       = "https://graph.microsoft.com/v1.0/"
 )
 
+// OAuthToken represents an OAuth2 Token.
+type OAuthToken oauth2.Token
+
+// OAuthConfig represents an OAuth2 Config.
+type OAuthConfig oauth2.Config
+
 // Sentinel errors
 var (
 	ErrReauthRequired   = errors.New("re-authentication required")
@@ -209,13 +215,10 @@ func GetMyDrives(client *http.Client) error {
 	return nil
 }
 
-// OAuthToken represents an OAuth2 Token.
-type OAuthToken oauth2.Token
-
 // StartAuthentication initiates the OAuth authentication process.
 func StartAuthentication(
 	ctx context.Context,
-	oauthConfig *oauth2.Config,
+	oauthConfig *OAuthConfig,
 ) (authURL string, codeVerifier string, err error) {
 	logger.Debug("StartAuthentication called")
 	if ctx == nil {
@@ -230,7 +233,9 @@ func StartAuthentication(
 		return "", "", fmt.Errorf("creating code verifier: %v", err)
 	}
 
-	authURL = oauthConfig.AuthCodeURL(
+	oauthConfig2 := oauth2.Config(*oauthConfig)
+
+	authURL = oauthConfig2.AuthCodeURL(
 		"state",
 		oauth2.SetAuthURLParam("code_challenge", verifier.CodeChallengeS256()),
 		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
@@ -241,7 +246,7 @@ func StartAuthentication(
 // CompleteAuthentication completes the OAuth authentication process.
 func CompleteAuthentication(
 	ctx context.Context,
-	oauthConfig *oauth2.Config,
+	oauthConfig *OAuthConfig,
 	code string,
 	verifier string,
 ) (*OAuthToken, error) {
@@ -250,7 +255,8 @@ func CompleteAuthentication(
 	}
 
 	logger.Debug("Exchanging code for token in CompleteAuthentication")
-	token, err := oauthConfig.Exchange(ctx, code, oauth2.SetAuthURLParam("code_verifier", verifier))
+	oauthConfig2 := oauth2.Config(*oauthConfig)
+	token, err := oauthConfig2.Exchange(ctx, code, oauth2.SetAuthURLParam("code_verifier", verifier))
 	if err != nil {
 		return nil, fmt.Errorf("exchanging code for token: %v", err)
 	}
@@ -260,14 +266,15 @@ func CompleteAuthentication(
 }
 
 // NewClient creates a new HTTP client with the given OAuth token.
-func NewClient(ctx context.Context, oauthConfig *oauth2.Config, token OAuthToken, tokenRefreshCallback func(*oauth2.Token)) *http.Client {
+func NewClient(ctx context.Context, oauthConfig *OAuthConfig, token OAuthToken, tokenRefreshCallback func(*oauth2.Token)) *http.Client {
 	if ctx == nil || oauthConfig == nil {
 		return nil
 	}
 
 	// TODO Ensure the token is valid or initialized before using it
 
-	originalTokenSource := oauthConfig.TokenSource(ctx, (*oauth2.Token)(&token))
+	oauthConfig2 := oauth2.Config(*oauthConfig)
+	originalTokenSource := oauthConfig2.TokenSource(ctx, (*oauth2.Token)(&token))
 	customTokenSource := &customTokenSource{
 		base:           originalTokenSource,
 		onTokenRefresh: tokenRefreshCallback,
@@ -278,13 +285,13 @@ func NewClient(ctx context.Context, oauthConfig *oauth2.Config, token OAuthToken
 }
 
 // GetOauth2Config returns the OAuth2 configuration.
-func GetOauth2Config(clientID string) (context.Context, *oauth2.Config) {
+func GetOauth2Config(clientID string) (context.Context, *OAuthConfig) {
 	logger.Debug("Creating OAuth2 configuration in getOauth2Config")
 	if clientID == "" {
 		return nil, nil
 	}
 
-	return context.Background(), &oauth2.Config{
+	oauth2Config := oauth2.Config{
 		ClientID: clientID,
 		Scopes:   OAuthScopes,
 		Endpoint: oauth2.Endpoint{
@@ -292,4 +299,5 @@ func GetOauth2Config(clientID string) (context.Context, *oauth2.Config) {
 			TokenURL: OAuthTokenURL,
 		},
 	}
+	return context.Background(), (*OAuthConfig)(&oauth2Config)
 }
