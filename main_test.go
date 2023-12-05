@@ -490,8 +490,8 @@ func TestStartAuthentication(t *testing.T) {
 	oauthConfig := &oauth2.Config{
 		ClientID: "test-client-id",
 		Endpoint: oauth2.Endpoint{
-			AuthURL:  OAuthAuthURL,
-			TokenURL: OAuthTokenURL,
+			AuthURL:  oAuthAuthURL,
+			TokenURL: oAuthTokenURL,
 		},
 	}
 

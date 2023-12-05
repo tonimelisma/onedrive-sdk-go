@@ -13,11 +13,11 @@ import (
 )
 
 // OAuth2 scopes and endpoints
-var OAuthScopes = []string{"offline_access", "files.readwrite.all"}
+var oAuthScopes = []string{"offline_access", "files.readwrite.all"}
 
 const (
-	OAuthAuthURL  = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
-	OAuthTokenURL = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+	oAuthAuthURL  = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
+	oAuthTokenURL = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
 	rootUrl       = "https://graph.microsoft.com/v1.0/"
 )
 
@@ -44,7 +44,7 @@ var (
 type customTokenSource struct {
 	base           oauth2.TokenSource
 	cachedToken    *oauth2.Token
-	onTokenRefresh func(*oauth2.Token)
+	onTokenRefresh func(OAuthToken)
 }
 
 func (cts *customTokenSource) Token() (*oauth2.Token, error) {
@@ -58,7 +58,7 @@ func (cts *customTokenSource) Token() (*oauth2.Token, error) {
 	if cts.cachedToken == nil || token.AccessToken != cts.cachedToken.AccessToken {
 		// Tokens are different, indicating a refresh
 		if cts.onTokenRefresh != nil {
-			cts.onTokenRefresh(token)
+			cts.onTokenRefresh(OAuthToken(*token))
 		}
 		cts.cachedToken = token // Update the cached token
 	}
@@ -91,7 +91,7 @@ func apiCall(client *http.Client, method, url string) (*http.Response, error) {
 	logger.Debug("apiCall invoked with method: ", method, ", URL: ", url)
 
 	if client == nil {
-		return nil, errors.New("http client is nil")
+		return nil, errors.New("HTTP client is nil, please provide a valid HTTP client")
 	}
 
 	req, err := http.NewRequest(method, url, nil)
@@ -116,7 +116,7 @@ func apiCall(client *http.Client, method, url string) (*http.Response, error) {
 			}
 		} else {
 			// Likely a network error?
-			return nil, fmt.Errorf("unsupported oauth2 error: %v", err)
+			return nil, fmt.Errorf("network error: %v", err)
 		}
 	}
 
@@ -222,7 +222,7 @@ func StartAuthentication(
 ) (authURL string, codeVerifier string, err error) {
 	logger.Debug("StartAuthentication called")
 	if ctx == nil {
-		return "", "", errors.New("oauth configuration is nil")
+		return "", "", errors.New("ctx is nil")
 	}
 	if oauthConfig == nil {
 		return "", "", errors.New("oauth configuration is nil")
@@ -233,9 +233,11 @@ func StartAuthentication(
 		return "", "", fmt.Errorf("creating code verifier: %v", err)
 	}
 
-	oauthConfig2 := oauth2.Config(*oauthConfig)
+	// Creating a new oauth2.Config object that we'll cast to our type conversion
+	// We maintain type conversion for oauth2 so users of the SDK don't have to import it
+	nativeOAuthConfig := oauth2.Config(*oauthConfig)
 
-	authURL = oauthConfig2.AuthCodeURL(
+	authURL = nativeOAuthConfig.AuthCodeURL(
 		"state",
 		oauth2.SetAuthURLParam("code_challenge", verifier.CodeChallengeS256()),
 		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
@@ -255,8 +257,11 @@ func CompleteAuthentication(
 	}
 
 	logger.Debug("Exchanging code for token in CompleteAuthentication")
-	oauthConfig2 := oauth2.Config(*oauthConfig)
-	token, err := oauthConfig2.Exchange(ctx, code, oauth2.SetAuthURLParam("code_verifier", verifier))
+
+	// Creating a new oauth2.Config object that we'll cast to our type conversion
+	// We maintain type conversion for oauth2 so users of the SDK don't have to import it
+	nativeOAuthConfig := oauth2.Config(*oauthConfig)
+	token, err := nativeOAuthConfig.Exchange(ctx, code, oauth2.SetAuthURLParam("code_verifier", verifier))
 	if err != nil {
 		return nil, fmt.Errorf("exchanging code for token: %v", err)
 	}
@@ -266,22 +271,20 @@ func CompleteAuthentication(
 }
 
 // NewClient creates a new HTTP client with the given OAuth token.
-func NewClient(ctx context.Context, oauthConfig *OAuthConfig, token OAuthToken, tokenRefreshCallback func(*OAuthToken)) *http.Client {
+func NewClient(ctx context.Context, oauthConfig *OAuthConfig, token OAuthToken, tokenRefreshCallback func(OAuthToken)) *http.Client {
 	if ctx == nil || oauthConfig == nil {
 		return nil
 	}
 
 	// TODO Ensure the token is valid or initialized before using it
 
-	tokenRefreshCallbackWrapper := func(token *oauth2.Token) {
-		tokenRefreshCallback((*OAuthToken)(token))
-	}
-
-	oauthConfig2 := oauth2.Config(*oauthConfig)
-	originalTokenSource := oauthConfig2.TokenSource(ctx, (*oauth2.Token)(&token))
+	// Creating a new oauth2.Config object that we'll cast to our type conversion
+	// We maintain type conversion for oauth2 so users of the SDK don't have to import it
+	nativeOAuthConfig := oauth2.Config(*oauthConfig)
+	originalTokenSource := nativeOAuthConfig.TokenSource(ctx, (*oauth2.Token)(&token))
 	customTokenSource := &customTokenSource{
 		base:           originalTokenSource,
-		onTokenRefresh: tokenRefreshCallbackWrapper,
+		onTokenRefresh: tokenRefreshCallback,
 		cachedToken:    (*oauth2.Token)(&token),
 	}
 
@@ -295,12 +298,14 @@ func GetOauth2Config(clientID string) (context.Context, *OAuthConfig) {
 		return nil, nil
 	}
 
+	// Creating a new oauth2.Config object that we'll cast to our type conversion
+	// We maintain type conversion for oauth2 so users of the SDK don't have to import it
 	oauth2Config := oauth2.Config{
 		ClientID: clientID,
-		Scopes:   OAuthScopes,
+		Scopes:   oAuthScopes,
 		Endpoint: oauth2.Endpoint{
-			AuthURL:  OAuthAuthURL,
-			TokenURL: OAuthTokenURL,
+			AuthURL:  oAuthAuthURL,
+			TokenURL: oAuthTokenURL,
 		},
 	}
 	return context.Background(), (*OAuthConfig)(&oauth2Config)

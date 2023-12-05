@@ -11,7 +11,8 @@ import (
 	"github.com/tonimelisma/onedrive-sdk-go"
 )
 
-const clientID = "71ae7ad2-0207-4618-90d3-d21db38f9f7a"
+// Register with Microsoft Azure to get your own client ID
+const clientID = "FILL-IN-YOUR-CLIENT-ID-HERE"
 
 // Main
 func main() {
@@ -67,7 +68,7 @@ func initializeOnedriveClient() (*http.Client, error) {
 
 	// Save the token to persistent storage so you can reload it when the program runs again
 
-	tokenRefreshCallbackFunc := func(token *onedrive.OAuthToken) {
+	tokenRefreshCallbackFunc := func(token onedrive.OAuthToken) {
 		// This function is run when the access and refresh token are refreshed
 		// Save the new token to persistent storage so you can reload it when the program runs again
 	}
