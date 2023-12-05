@@ -2,6 +2,8 @@
 
 OneDrive SDK for Golang
 
+Still alpha
+
 See ```examples/``` folder for examples
 
 ## TODO
